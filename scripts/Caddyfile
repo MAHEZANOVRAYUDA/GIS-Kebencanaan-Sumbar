@@ -1,0 +1,66 @@
+# ==============================================================================
+# Konfigurasi Caddy Reverse Proxy & HTTPS Otomatis (Tanpa Docker)
+# Referensi: 08-keamanan-deployment.md
+# Lokasi file di server Linux: /etc/caddy/Caddyfile
+# ==============================================================================
+
+dashboardbencana.sumbarprov.go.id {
+    # 1. Kompresi Cepat (Gzip & Zstandard) untuk Menghemat Bandwidth Jaringan Darurat
+    encode zstd gzip
+
+    # 2. HTTP Security Headers (Checklist Keamanan OWASP)
+    header {
+        # Mencegah MIME sniffing
+        X-Content-Type-Options "nosniff"
+        # Mencegah clickjacking
+        X-Frame-Options "DENY"
+        # XSS Protection
+        X-XSS-Protection "1; mode=block"
+        # Referrer Policy
+        Referrer-Policy "strict-origin-when-cross-origin"
+        # HSTS (Strict-Transport-Security)
+        Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+        # Cross-Origin Policies
+        Cross-Origin-Opener-Policy "same-origin"
+        Cross-Origin-Resource-Policy "same-origin"
+        # Hapus header server footprint
+        -Server
+    }
+
+    # 3. Proxy API Backend FastAPI (Port 8000 Lokal)
+    handle /api/* {
+        reverse_proxy 127.0.0.1:8000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+            
+            # Response timeout
+            transport http {
+                response_header_timeout 15s
+            }
+        }
+    }
+
+    # 4. Proxy Tile PMTiles & Vector Tile Caching
+    handle /tiles/* {
+        root * /opt/gis-sumbar/gis-data/pmtiles
+        file_server
+        header Cache-Control "public, max-age=604800, stale-while-revalidate=86400"
+    }
+
+    # 5. Frontend Single Page Application (SPA / PWA)
+    handle {
+        root * /opt/gis-sumbar/frontend/dist
+        try_files {path} /index.html
+        file_server
+        
+        # Cache-control khusus aset statis
+        @static path *.js *.css *.png *.svg *.pbf *.json
+        header @static Cache-Control "public, max-age=2592000, immutable"
+        
+        # Service Worker & Manifest tidak boleh di-cache permanen agar selalu update
+        @sw path /sw.js /manifest.webmanifest /registerSW.js
+        header @sw Cache-Control "no-cache, no-store, must-revalidate"
+    }
+}

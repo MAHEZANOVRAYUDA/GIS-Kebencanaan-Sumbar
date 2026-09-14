@@ -1,0 +1,54 @@
+# Environment & Secrets
+.env
+backend/.env
+*.env.local
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+.venv/
+ENV/
+
+# Node / Frontend
+node_modules/
+frontend/dist/
+frontend/node_modules/
+.npm
+.eslintcache
+
+# GIS Large Data
+gis-data/raw/*.osm.pbf
+gis-data/pmtiles/*.pmtiles
+routing/osrm-data/*
+!routing/osrm-data/.gitkeep
+routing/valhalla-data/*
+!routing/valhalla-data/.gitkeep
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+Thumbs.db
+[Dd]esktop.ini
+.DS_Store

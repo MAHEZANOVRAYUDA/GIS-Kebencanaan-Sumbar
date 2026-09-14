@@ -1,0 +1,24 @@
+[Unit]
+Description=GIS Sumbar Backend API (FastAPI & Uvicorn)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=gisapp
+Group=gisapp
+WorkingDirectory=/opt/gis-sumbar/backend
+Environment="PATH=/opt/gis-sumbar/backend/venv/bin:/usr/local/bin:/usr/bin"
+EnvironmentFile=/opt/gis-sumbar/backend/.env
+ExecStart=/opt/gis-sumbar/backend/venv/bin/gunicorn app.main:app \
+    -k uvicorn.workers.UvicornWorker \
+    --workers 4 \
+    --bind 127.0.0.1:8000 \
+    --access-logfile /var/log/gis-backend-access.log \
+    --error-logfile /var/log/gis-backend-error.log
+Restart=always
+RestartSec=5
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

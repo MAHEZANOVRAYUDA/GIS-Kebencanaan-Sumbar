@@ -1,0 +1,16 @@
+[Unit]
+Description=GIS Sumbar OSRM Routing Engine
+After=network.target
+
+[Service]
+Type=simple
+User=gisapp
+Group=gisapp
+WorkingDirectory=/opt/gis-sumbar/routing/osrm-data
+ExecStart=/usr/local/bin/osrm-routed --algorithm mld --ip 127.0.0.1 --port 5000 /opt/gis-sumbar/routing/osrm-data/sumbar-latest.osrm
+Restart=always
+RestartSec=10
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

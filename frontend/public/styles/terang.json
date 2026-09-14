@@ -1,0 +1,47 @@
+{
+  "version": 8,
+  "name": "Sumbar Topografi (BPBD Sumbar)",
+  "metadata": {
+    "maputnik:renderer": "mlgljs",
+    "theme": "light"
+  },
+  "glyphs": "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+  "sources": {
+    "esri-topo": {
+      "type": "raster",
+      "tiles": [
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}"
+      ],
+      "tileSize": 256,
+      "attribution": "&copy; Esri, DeLorme, NAVTEQ, USGS, BPBD Sumbar"
+    },
+    "terrain-dem": {
+      "type": "raster-dem",
+      "tiles": [
+        "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
+      ],
+      "tileSize": 256,
+      "encoding": "terrarium",
+      "maxzoom": 15
+    }
+  },
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#FAFAF8"
+      }
+    },
+    {
+      "id": "base-raster",
+      "type": "raster",
+      "source": "esri-topo",
+      "minzoom": 0,
+      "maxzoom": 19,
+      "paint": {
+        "raster-opacity": 0.98
+      }
+    }
+  ]
+}

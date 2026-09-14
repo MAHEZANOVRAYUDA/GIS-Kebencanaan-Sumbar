@@ -1,0 +1,50 @@
+{
+  "version": 8,
+  "name": "Sumbar Satelit Hibrida (BPBD Sumbar)",
+  "metadata": {
+    "maputnik:renderer": "mlgljs",
+    "theme": "satellite"
+  },
+  "glyphs": "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+  "sources": {
+    "google-hybrid": {
+      "type": "raster",
+      "tiles": [
+        "https://mt0.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+        "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+        "https://mt2.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+        "https://mt3.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
+      ],
+      "tileSize": 256,
+      "attribution": "&copy; Google Maps, BPBD Prov. Sumbar & Riset LPPM"
+    },
+    "terrain-dem": {
+      "type": "raster-dem",
+      "tiles": [
+        "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
+      ],
+      "tileSize": 256,
+      "encoding": "terrarium",
+      "maxzoom": 15
+    }
+  },
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#0B131E"
+      }
+    },
+    {
+      "id": "base-raster",
+      "type": "raster",
+      "source": "google-hybrid",
+      "minzoom": 0,
+      "maxzoom": 20,
+      "paint": {
+        "raster-opacity": 1.0
+      }
+    }
+  ]
+}

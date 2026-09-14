@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+:root {
+  /* Warna dasar — netral gelap khas command center BPBD */
+  --color-bg-primary: #0F1720;
+  --color-bg-surface: #1B2733;
+  --color-bg-surface-elevated: #243444;
+  --color-bg-light: #FAFAF8;
+  --color-bg-light-surface: #FFFFFF;
+
+  /* Warna semantik kebencanaan standar BPBD */
+  --color-danger: #C0392B;      /* kerusakan berat, gempa besar, tsunami */
+  --color-danger-hover: #A93226;
+  --color-warning: #D98E04;     /* kerusakan sedang, peringatan cuaca */
+  --color-safe: #1E7A46;        /* aman, posko aktif, jalan lancar */
+  --color-info: #2C6E8C;        /* informasi netral, air/sungai */
+
+  /* Brand / identitas kelembagaan Sumatera Barat */
+  --color-brand: #1E3A5F;
+  --color-brand-light: #3A5A82;
+  --color-marawa-red: #D72638;
+  --color-marawa-gold: #F4B400;
+  --color-marawa-black: #111111;
+
+  /* Tipografi */
+  --font-display: 'Space Grotesk', 'Inter', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--color-bg-primary);
+  color: #E2E8F0;
+  margin: 0;
+  padding: 0;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* Kustomisasi kontrol MapLibre agar menyatu dengan UI Command Center */
+.maplibregl-ctrl-group {
+  background: #1B2733 !important;
+  border: 1px solid #2D3F52 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+}
+
+.maplibregl-ctrl-group button {
+  border-bottom: 1px solid #2D3F52 !important;
+  filter: invert(0.9) hue-rotate(180deg);
+}
+
+/* Tooltip Popup MapLibre Hover Kustom */
+.gis-hover-popup .maplibregl-popup-content {
+  background: rgba(15, 23, 32, 0.94) !important;
+  backdrop-filter: blur(10px) !important;
+  border: 1px solid #3A5A82 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6) !important;
+  padding: 4px 8px !important;
+  color: #E2E8F0 !important;
+}
+
+.gis-hover-popup .maplibregl-popup-tip {
+  border-top-color: #3A5A82 !important;
+  border-bottom-color: #3A5A82 !important;
+}
+
+.maplibregl-ctrl-group button:last-child {
+  border-bottom: none !important;
+}
+
+.maplibregl-ctrl-group button:hover {
+  background-color: #243444 !important;
+}

@@ -1,0 +1,79 @@
+{
+  "version": 8,
+  "name": "Sumbar Gelap PMTiles (Vector)",
+  "metadata": {
+    "theme": "dark",
+    "type": "pmtiles"
+  },
+  "sources": {
+    "basemap": {
+      "type": "vector",
+      "url": "pmtiles:///tiles/sumbar-basemap.pmtiles"
+    },
+    "terrain-dem": {
+      "type": "raster-dem",
+      "tiles": [
+        "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
+      ],
+      "tileSize": 256,
+      "encoding": "terrarium",
+      "maxzoom": 15
+    }
+  },
+  "glyphs": "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#0F1720"
+      }
+    },
+    {
+      "id": "water",
+      "type": "fill",
+      "source": "basemap",
+      "source-layer": "water",
+      "paint": {
+        "fill-color": "#1A2F42"
+      }
+    },
+    {
+      "id": "landuse-vegetation",
+      "type": "fill",
+      "source": "basemap",
+      "source-layer": "landuse",
+      "filter": ["==", "class", "wood"],
+      "paint": {
+        "fill-color": "#16241C"
+      }
+    },
+    {
+      "id": "roads-major",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "transportation",
+      "filter": ["in", "class", "motorway", "trunk", "primary"],
+      "paint": {
+        "line-color": "#3A5A82",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 8, 1, 16, 5]
+      }
+    },
+    {
+      "id": "place-labels",
+      "type": "symbol",
+      "source": "basemap",
+      "source-layer": "place",
+      "layout": {
+        "text-field": ["get", "name"],
+        "text-font": ["Noto Sans Regular"],
+        "text-size": 13
+      },
+      "paint": {
+        "text-color": "#E8ECF1",
+        "text-halo-color": "#0F1720",
+        "text-halo-width": 1.2
+      }
+    }
+  ]
+}

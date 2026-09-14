@@ -1,0 +1,64 @@
+{
+  "version": 8,
+  "name": "Sumbar Gelap (BPBD Sumbar)",
+  "metadata": {
+    "maputnik:renderer": "mlgljs",
+    "theme": "dark"
+  },
+  "glyphs": "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+  "sources": {
+    "esri-dark-base": {
+      "type": "raster",
+      "tiles": [
+        "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+      ],
+      "tileSize": 256,
+      "attribution": "&copy; Esri, DeLorme, NAVTEQ, BPBD Sumbar"
+    },
+    "esri-dark-reference": {
+      "type": "raster",
+      "tiles": [
+        "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}"
+      ],
+      "tileSize": 256
+    },
+    "terrain-dem": {
+      "type": "raster-dem",
+      "tiles": [
+        "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
+      ],
+      "tileSize": 256,
+      "encoding": "terrarium",
+      "maxzoom": 15
+    }
+  },
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#0F1720"
+      }
+    },
+    {
+      "id": "base-raster",
+      "type": "raster",
+      "source": "esri-dark-base",
+      "minzoom": 0,
+      "maxzoom": 19,
+      "paint": {
+        "raster-opacity": 0.95
+      }
+    },
+    {
+      "id": "reference-raster",
+      "type": "raster",
+      "source": "esri-dark-reference",
+      "minzoom": 0,
+      "maxzoom": 19,
+      "paint": {
+        "raster-opacity": 0.85
+      }
+    }
+  ]
+}
