@@ -107,3 +107,86 @@ async def get_ringkasan_eksekutif(db: AsyncSession = Depends(get_async_db)):
         },
         "prioritas_wilayah": top_wilayah
     }
+
+@router.get("/verifikasi-queue")
+async def get_verifikasi_queue(
+    current_user: Pengguna = Depends(require_role(["admin", "pimpinan", "operator"])),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """
+    Mengambil antrean laporan lapangan yang berstatus 'menunggu' untuk diverifikasi supervisor Pusdalops.
+    """
+    bencana_q = text("""
+        SELECT 
+            k.id, k.jenis_bencana, k.tanggal_kejadian, k.deskripsi, k.status_verifikasi,
+            k.sumber_data, w.nama AS wilayah_nama, p.nama AS pelapor_nama,
+            COALESCE(ST_X(k.lokasi), 0) AS lon, COALESCE(ST_Y(k.lokasi), 0) AS lat
+        FROM kejadian_bencana k
+        LEFT JOIN wilayah_administratif w ON w.id = k.wilayah_id
+        LEFT JOIN pengguna p ON p.id = k.dibuat_oleh
+        WHERE k.status_verifikasi = 'menunggu'
+        ORDER BY k.tanggal_kejadian DESC;
+    """)
+    bencana_res = await db.execute(bencana_q)
+    bencana_rows = bencana_res.fetchall()
+
+    items = []
+    for r in bencana_rows:
+        items.append({
+            "id": r.id,
+            "jenis": r.jenis_bencana,
+            "tanggal": r.tanggal_kejadian.isoformat() if r.tanggal_kejadian else None,
+            "wilayah": r.wilayah_nama or "Sumatera Barat",
+            "deskripsi": r.deskripsi,
+            "sumber_data": r.sumber_data,
+            "pelapor": r.pelapor_nama or "Petugas Lapangan",
+            "status": r.status_verifikasi,
+            "lat": float(r.lat) if r.lat != 0 else None,
+            "lon": float(r.lon) if r.lon != 0 else None,
+        })
+
+    return {
+        "total_antrean": len(items),
+        "data": items
+    }
+
+@router.get("/audit-logs")
+async def list_audit_logs(
+    limit: int = 50,
+    current_user: Pengguna = Depends(require_role(["admin", "pimpinan"])),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """
+    Admin & Pimpinan: Mengambil 50 aktivitas mutasi data dan jejak audit terbaru.
+    """
+    query = text("""
+        SELECT 
+            a.id, a.aksi, a.tabel_target, a.record_id, a.detail, a.ip_address, a.created_at,
+            p.nama AS pengguna_nama, p.role AS pengguna_role
+        FROM audit_log a
+        LEFT JOIN pengguna p ON p.id = a.pengguna_id
+        ORDER BY a.created_at DESC
+        LIMIT :limit;
+    """)
+    res = await db.execute(query, {"limit": limit})
+    rows = res.fetchall()
+
+    logs = []
+    for r in rows:
+        logs.append({
+            "id": r.id,
+            "aksi": r.aksi,
+            "tabel": r.tabel_target,
+            "record_id": r.record_id,
+            "detail": r.detail,
+            "ip_address": str(r.ip_address) if r.ip_address else None,
+            "operator": r.pengguna_nama or "Sistem",
+            "role": r.pengguna_role or "-",
+            "waktu": r.created_at.isoformat() if r.created_at else None
+        })
+
+    return {
+        "count": len(logs),
+        "data": logs
+    }
+

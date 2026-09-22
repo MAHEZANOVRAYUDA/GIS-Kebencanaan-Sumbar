@@ -50,7 +50,9 @@ class WilayahDampakResponse(BaseModel):
     sekolah_rusak: int = 0
     terakhir_refresh: Optional[datetime] = None
     tingkat_risiko: str = "rendah"  # 'rendah' | 'sedang' | 'tinggi'
+    center: Optional[Dict[str, float]] = None
     kejadian_terbaru: List[KejadianRingkas] = []
+    parent_dampak: Optional[Dict[str, Any]] = None
 
 class GeoJSONFeature(BaseModel):
     type: str = "Feature"

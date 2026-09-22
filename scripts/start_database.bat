@@ -1,6 +1,21 @@
 @echo off
 echo ===================================================
-echo Menjalankan PostgreSQL 18 + PostGIS 3.6.2 (Port 5433)
+echo Memeriksa Layanan PostgreSQL + PostGIS (Port 5433)
 echo ===================================================
-E:\pgsql\bin\postgres.exe -D E:\pgsql\data
-pause
+
+netstat -ano | findstr :5433 | findstr LISTENING > nul
+if %errorlevel% equ 0 (
+    echo [OK] PostgreSQL/PostGIS telah aktif berjalan di port 5433!
+    echo Layanan siap digunakan oleh backend API.
+    timeout /t 3 > nul
+    exit /b 0
+)
+
+echo Port 5433 belum aktif. Memulai instance PostgreSQL...
+if exist "E:\pgsql\bin\postgres.exe" (
+    E:\pgsql\bin\postgres.exe -D E:\pgsql\data
+) else (
+    echo [INFO] Jalur E:\pgsql\bin\postgres.exe tidak ditemukan.
+    echo Silakan jalankan service PostgreSQL Anda melalui Windows Services (services.msc).
+    pause
+)

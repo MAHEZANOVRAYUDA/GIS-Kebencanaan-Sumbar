@@ -10,7 +10,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from app.core.config import settings
-from app.routers import health, wilayah, auth, routing, jalan, eksternal, admin, bencana, tiles, sitrep
+from app.routers import health, wilayah, auth, routing, posko, jalan, eksternal, admin, bencana, tiles, sitrep, cascading_wilayah, chatbot
 from app.services.bmkg_service import start_bmkg_scheduler, sync_gempa_bmkg
 from app.routers.tiles import start_tiles_scheduler
 
@@ -106,17 +106,21 @@ async def global_exception_handler(request: Request, exc: Exception):
         },
     )
 
-# Daftarkan Seluruh Router (Fase 1, 2, 3, & Fase 4 Vector Tiles)
+# Daftarkan Seluruh Router (Fase 1, 2, 3, 4, & CRUD Posko/Bencana)
 app.include_router(health.router, prefix="/api")
 app.include_router(wilayah.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
 app.include_router(routing.router, prefix="/api")
+app.include_router(posko.router, prefix="/api")
 app.include_router(jalan.router, prefix="/api")
 app.include_router(eksternal.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(bencana.router, prefix="/api")
 app.include_router(tiles.router, prefix="/api")
 app.include_router(sitrep.router, prefix="/api")
+app.include_router(chatbot.router, prefix="/api")
+app.include_router(cascading_wilayah.router)
+app.include_router(cascading_wilayah.router, prefix="/api")
 
 
 @app.get("/", include_in_schema=False)

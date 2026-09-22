@@ -48,30 +48,15 @@ body {
 .maplibregl-ctrl-group {
   background: #1B2733 !important;
   border: 1px solid #2D3F52 !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
-  border-radius: 8px !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45) !important;
+  border-radius: 10px !important;
   overflow: hidden;
 }
 
 .maplibregl-ctrl-group button {
   border-bottom: 1px solid #2D3F52 !important;
   filter: invert(0.9) hue-rotate(180deg);
-}
-
-/* Tooltip Popup MapLibre Hover Kustom */
-.gis-hover-popup .maplibregl-popup-content {
-  background: rgba(15, 23, 32, 0.94) !important;
-  backdrop-filter: blur(10px) !important;
-  border: 1px solid #3A5A82 !important;
-  border-radius: 8px !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6) !important;
-  padding: 4px 8px !important;
-  color: #E2E8F0 !important;
-}
-
-.gis-hover-popup .maplibregl-popup-tip {
-  border-top-color: #3A5A82 !important;
-  border-bottom-color: #3A5A82 !important;
+  transition: background-color 0.15s ease;
 }
 
 .maplibregl-ctrl-group button:last-child {
@@ -80,4 +65,66 @@ body {
 
 .maplibregl-ctrl-group button:hover {
   background-color: #243444 !important;
+}
+
+/* Posisi Kontrol Peta: Offset ke bawah agar tidak bertabrakan dengan Header Bar */
+.maplibregl-ctrl-top-right {
+  top: 72px !important;
+  right: 14px !important;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.maplibregl-ctrl-bottom-left {
+  bottom: 10px !important;
+  left: 14px !important;
+}
+
+/* Tooltip Popup MapLibre Hover Kustom (High-Fidelity Glassmorphism) */
+.gis-hover-popup {
+  max-width: 440px !important;
+  z-index: 50 !important;
+  pointer-events: none !important;
+}
+
+.gis-hover-popup .maplibregl-popup-content {
+  background: rgba(10, 16, 26, 0.96) !important;
+  backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(56, 189, 248, 0.28) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 16px 40px -4px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+  padding: 10px 12px !important;
+  color: #F1F5F9 !important;
+  width: max-content !important;
+  max-width: 420px !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+/* Penyesuaian panah popup tip di semua 8 orientasi agar serasi dengan latar gelap */
+.gis-hover-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip { border-bottom-color: rgba(10, 16, 26, 0.96) !important; }
+.gis-hover-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip { border-top-color: rgba(10, 16, 26, 0.96) !important; }
+.gis-hover-popup.maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: rgba(10, 16, 26, 0.96) !important; }
+.gis-hover-popup.maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: rgba(10, 16, 26, 0.96) !important; }
+.gis-hover-popup.maplibregl-popup-anchor-top-left .maplibregl-popup-tip { border-bottom-color: rgba(10, 16, 26, 0.96) !important; }
+.gis-hover-popup.maplibregl-popup-anchor-top-right .maplibregl-popup-tip { border-bottom-color: rgba(10, 16, 26, 0.96) !important; }
+.gis-hover-popup.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip { border-top-color: rgba(10, 16, 26, 0.96) !important; }
+.gis-hover-popup.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip { border-top-color: rgba(10, 16, 26, 0.96) !important; }
+
+/* Custom Sleek Dark Scrollbars untuk Modal & Panel */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 32, 0.4);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb {
+  background: #2B3E52;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3B536D;
 }

@@ -52,3 +52,9 @@ routing/valhalla-data/*
 Thumbs.db
 [Dd]esktop.ini
 .DS_Store
+
+# Build & Tool Caches
+.vite/
+frontend/.vite/
+graphify-out/cache/
+graphify-out/2026-*/

@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import json
 from datetime import datetime
 
@@ -10,6 +10,7 @@ from app.core.database import get_async_db
 from app.core.dependencies import require_role
 from app.models.jalan import JalanTerputus
 from app.models.pengguna import Pengguna
+from app.services.audit_service import record_audit
 
 router = APIRouter(prefix="/jalan-terputus", tags=["Jalan Terputus (Blokade Bencana)"])
 
@@ -23,6 +24,11 @@ class JalanCreateRequest(BaseModel):
     geometry: CoordinatesList
     alasan: str = Field(..., description="Alasan: longsor | banjir | jembatan_putus | kerusakan_jalan | lainnya")
     deskripsi: Optional[str] = None
+
+class JalanUpdateRequest(BaseModel):
+    alasan: Optional[str] = None
+    deskripsi: Optional[str] = None
+    status: Optional[str] = Field(None, description="aktif | sebagian | pulih")
 
 class JalanPulihkanResponse(BaseModel):
     id: int
@@ -73,6 +79,7 @@ async def list_jalan_terputus(db: AsyncSession = Depends(get_async_db)):
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_jalan_terputus(
     payload: JalanCreateRequest,
+    request: Request,
     current_user: Pengguna = Depends(require_role(["operator", "admin"])),
     db: AsyncSession = Depends(get_async_db)
 ):
@@ -125,6 +132,19 @@ async def create_jalan_terputus(
         "user_id": current_user.id
     })
     row = result.fetchone()
+
+    # Catat Audit Log
+    client_ip = request.client.host if request.client else None
+    await record_audit(
+        db=db,
+        pengguna_id=current_user.id,
+        aksi="CREATE_JALAN_TERPUTUS",
+        tabel_target="jalan_terputus",
+        record_id=row.id,
+        detail={"alasan": payload.alasan, "points_count": len(coords)},
+        ip_address=client_ip
+    )
+
     await db.commit()
 
     return {
@@ -135,9 +155,80 @@ async def create_jalan_terputus(
         "tanggal_lapor": row.tanggal_lapor.isoformat() if row.tanggal_lapor else None
     }
 
+@router.put("/{jalan_id}")
+async def update_jalan_terputus(
+    jalan_id: int,
+    payload: JalanUpdateRequest,
+    request: Request,
+    current_user: Pengguna = Depends(require_role(["operator", "admin"])),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """
+    Operator & Admin: Memperbarui alasan, deskripsi, atau status penanganan ruas jalan.
+    """
+    check_query = text("SELECT id, alasan, status FROM jalan_terputus WHERE id = :id;")
+    existing = (await db.execute(check_query, {"id": jalan_id})).fetchone()
+    if not existing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "NOT_FOUND", "message": f"Ruas jalan dengan ID {jalan_id} tidak ditemukan."}}
+        )
+
+    updates = []
+    params: Dict[str, Any] = {"id": jalan_id}
+
+    if payload.alasan:
+        updates.append("alasan = :alasan")
+        params["alasan"] = payload.alasan
+    if payload.deskripsi is not None:
+        updates.append("deskripsi = :deskripsi")
+        params["deskripsi"] = payload.deskripsi
+    if payload.status:
+        valid_status = ['aktif', 'sebagian', 'pulih']
+        if payload.status not in valid_status:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={"error": {"code": "INVALID_STATUS", "message": f"Status harus salah satu dari: {', '.join(valid_status)}"}}
+            )
+        updates.append("status = :status")
+        params["status"] = payload.status
+        if payload.status == 'pulih':
+            updates.append("tanggal_pulih = now()")
+
+    if updates:
+        sql = text(f"""
+            UPDATE jalan_terputus
+            SET {', '.join(updates)}
+            WHERE id = :id
+            RETURNING id, alasan, status;
+        """)
+        res = await db.execute(sql, params)
+        row = res.fetchone()
+
+        # Catat Audit Log
+        client_ip = request.client.host if request.client else None
+        await record_audit(
+            db=db,
+            pengguna_id=current_user.id,
+            aksi="UPDATE_JALAN_TERPUTUS",
+            tabel_target="jalan_terputus",
+            record_id=jalan_id,
+            detail=params,
+            ip_address=client_ip
+        )
+        await db.commit()
+        return {
+            "message": f"Ruas jalan ID {jalan_id} berhasil diperbarui.",
+            "id": row.id,
+            "status": row.status
+        }
+
+    return {"message": "Tidak ada perubahan data.", "id": jalan_id}
+
 @router.put("/{jalan_id}/pulihkan", response_model=JalanPulihkanResponse)
 async def pulihkan_jalan(
     jalan_id: int,
+    request: Request,
     current_user: Pengguna = Depends(require_role(["operator", "admin"])),
     db: AsyncSession = Depends(get_async_db)
 ):
@@ -162,9 +253,58 @@ async def pulihkan_jalan(
                 }
             }
         )
+
+    client_ip = request.client.host if request.client else None
+    await record_audit(
+        db=db,
+        pengguna_id=current_user.id,
+        aksi="PULIHKAN_JALAN",
+        tabel_target="jalan_terputus",
+        record_id=jalan_id,
+        detail={"status": "pulih"},
+        ip_address=client_ip
+    )
+
     await db.commit()
     return JalanPulihkanResponse(
         id=row.id,
         status=row.status,
         pesan="Status ruas jalan berhasil diubah menjadi pulih."
     )
+
+@router.delete("/{jalan_id}")
+async def delete_jalan_terputus(
+    jalan_id: int,
+    request: Request,
+    current_user: Pengguna = Depends(require_role(["operator", "admin"])),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """
+    Operator & Admin: Menghapus catatan ruas jalan terputus.
+    """
+    query = text("DELETE FROM jalan_terputus WHERE id = :id RETURNING id, alasan;")
+    res = await db.execute(query, {"id": jalan_id})
+    row = res.fetchone()
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "NOT_FOUND", "message": f"Ruas jalan ID {jalan_id} tidak ditemukan."}}
+        )
+
+    client_ip = request.client.host if request.client else None
+    await record_audit(
+        db=db,
+        pengguna_id=current_user.id,
+        aksi="DELETE_JALAN_TERPUTUS",
+        tabel_target="jalan_terputus",
+        record_id=jalan_id,
+        detail={"alasan": row.alasan},
+        ip_address=client_ip
+    )
+
+    await db.commit()
+    return {
+        "message": f"Ruas jalan ID {jalan_id} berhasil dihapus dari sistem.",
+        "id": row.id
+    }
+

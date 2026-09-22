@@ -64,15 +64,17 @@ async def get_choropleth_tile(
     z: int = Path(..., ge=0, le=22, description="Zoom level (0-22)"),
     x: int = Path(..., ge=0, description="Tile X coordinate"),
     y: int = Path(..., ge=0, description="Tile Y coordinate"),
+    level: str = Query("kabupaten", description="Level wilayah: 'kabupaten' (makro default) atau 'kecamatan'"),
     v: Optional[str] = Query(None, description="Cache buster version"),
     db: AsyncSession = Depends(get_async_db)
 ):
     """
-    Menyajikan Vector Tile (MVT) poligon kecamatan beserta data agregasi dampak bencana.
+    Menyajikan Vector Tile (MVT) poligon kabupaten/kecamatan beserta data agregasi dampak bencana.
     Memanfaatkan fungsi native PostGIS ST_TileEnvelope, ST_AsMVTGeom, dan ST_AsMVT.
-    Jauh lebih cepat dan hemat bandwidth dibanding GeoJSON mentah (11-optimasi-performa.md).
+    Tampilan default makro menyajikan 19 Kabupaten/Kota di Sumatera Barat.
     """
-    cache_key = (z, x, y, v)
+    target_level = "kecamatan" if level and level.lower() == "kecamatan" else "kabupaten"
+    cache_key = (z, x, y, v, target_level)
     if cache_key in _tile_cache:
         return Response(
             content=_tile_cache[cache_key],
@@ -112,7 +114,7 @@ async def get_choropleth_tile(
                 ) AS geom
             FROM wilayah_administratif w
             LEFT JOIN mv_dampak_per_kecamatan mv ON mv.wilayah_id = w.id
-            WHERE (w.level = 'kabupaten' OR (w.level = 'kecamatan' AND w.geom IS NOT NULL))
+            WHERE w.level = :target_level
               AND w.geom IS NOT NULL
               AND ST_Intersects(
                   {geom_expr},
@@ -122,7 +124,7 @@ async def get_choropleth_tile(
         SELECT ST_AsMVT(mvtgeom.*, 'choropleth_kecamatan') AS mvt FROM mvtgeom;
     """)
 
-    result = await db.execute(sql, {"z": z, "x": x, "y": y})
+    result = await db.execute(sql, {"z": z, "x": x, "y": y, "target_level": target_level})
     tile_data = result.scalar()
 
     tile_bytes = bytes(tile_data) if tile_data else b""

@@ -9,7 +9,74 @@
 │  │  React + Vite + TypeScript + Tailwind                    │    │
 │  │  ├── MapLibre GL JS (render peta)                        │    │
 │  │  ├── Service Worker / Workbox (PWA, offline cache)        │    │
-│  │  └── Apache ECharts (grafik statistik)                    │    │
+│  │  └── Apache ECharts (gSaya sedang membangun sistem GIS Kebencanaan untuk Provinsi Sumatera Barat —
+modernisasi modul peta pada dashboardbencana.sumbarprov.go.id. Ini proyek
+riset LPPM, tim kecil, tahap saat ini fokus demo/presentasi ke BPBD Sumbar
+dan Diskominfotik, bukan langsung produksi.
+
+Seluruh dokumentasi teknis proyek ada di folder gis-sumbar-md/ di root ini
+(12 file .md). SEBELUM menulis kode apa pun:
+
+1. Baca gis-sumbar-md/00-overview.md untuk konteks proyek secara keseluruhan
+2. Baca gis-sumbar-md/09-agent-instructions.md — instruksi khusus untuk kamu
+   sebagai AI coding agent, berisi batasan keras yang tidak boleh dilanggar
+   tanpa saya konfirmasi eksplisit
+3. Baca gis-sumbar-md/01-arsitektur.md untuk gambaran arsitektur sistem
+
+Tiga batasan paling penting yang saya tekankan ulang di sini:
+- Engine peta WAJIB MapLibre GL JS. JANGAN gunakan Leaflet dalam bentuk
+  apa pun, termasuk sebagai dependency tidak langsung.
+- JANGAN gunakan Docker/docker-compose untuk deployment tahap ini. Ikuti
+  pendekatan manual di gis-sumbar-md/08-keamanan-deployment.md.
+- UI/UX HARUS mengikuti gis-sumbar-md/04-frontend-ui-ux.md secara detail —
+  jangan buat dashboard generik dengan kartu-kartu template Bootstrap/
+  Tailwind biru-ungu gradient.
+
+Cakupan wilayah: HANYA Provinsi Sumatera Barat (19 kabupaten/kota, 147
+kecamatan). Bounding box dan daftar koordinat ada di
+gis-sumbar-md/10-katalog-data-sumbar.md.
+
+STATUS PROYEK SAAT INI: belum ada kode sama sekali, ini sesi pertama,
+mulai dari nol.
+
+UNTUK SESI KERJA INI, kerjakan HANYA Fase 1 (Fondasi) sesuai roadmap di
+00-overview.md:
+
+1. Setup PostgreSQL + PostGIS dengan skema lengkap dari
+   gis-sumbar-md/02-database.md — termasuk semua tabel (wilayah_administratif,
+   kejadian_bencana, data_dampak_bencana, posko_evakuasi, jalan_terputus,
+   gempa_bmkg, pengguna, audit_log) DAN materialized view
+   mv_dampak_per_kecamatan beserta unique index-nya. Gunakan Alembic untuk
+   migrasi sejak awal, jangan buat skema manual tanpa migration tool.
+
+2. Setup struktur proyek dasar sesuai struktur direktori di
+   01-arsitektur.md: folder backend/ (FastAPI), frontend/ (React+Vite+
+   TypeScript+Tailwind), gis-data/ untuk aset peta.
+
+3. Setup backend API dasar (FastAPI) dengan endpoint minimal:
+   - GET /api/health (health check sederhana)
+   - GET /api/wilayah (daftar wilayah, filter by level & parent_id)
+   - GET /api/wilayah/{id} (detail satu wilayah + geometri GeoJSON)
+   Ikuti kontrak di gis-sumbar-md/03-backend-api.md untuk format response.
+
+4. Render basemap MapLibre GL JS paling sederhana di frontend — untuk
+   sesi ini BOLEH pakai tile sementara/placeholder (misal basemap gratis
+   apa pun yang mudah dipasang), BELUM perlu generate PMTiles custom
+   penuh. Yang penting: peta tampil, bisa pan/zoom, dan center ke wilayah
+   Sumbar (bounding box ada di 10-katalog-data-sumbar.md). Beri komentar
+   jelas di kode bahwa basemap ini SEMENTARA dan harus diganti PMTiles
+   self-hosted sebelum dianggap production (lihat 05-peta-gis.md).
+
+JANGAN kerjakan choropleth, drill-down wilayah, evakuasi, atau integrasi
+BMKG/BNPB dulu — itu untuk fase berikutnya.
+
+Definisi selesai untuk Fase 1: saya bisa menjalankan backend, database
+sudah terisi skema lengkap (boleh kosong datanya), dan saat membuka
+frontend saya melihat peta yang bisa di-pan/zoom berpusat di Sumbar.
+
+Sebelum mulai menulis kode, ringkas ke saya: apa yang kamu pahami dari
+batasan di atas, dan urutan langkah konkret yang akan kamu kerjakan.
+Tunggu konfirmasi saya dulu.rafik statistik)                    │    │
 │  └─────────────────────────────────────────────────────────┘    │
 └───────────────┬─────────────────────────────┬───────────────────┘
                 │ HTTPS/REST + WebSocket        │ HTTP range requests

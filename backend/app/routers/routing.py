@@ -2,17 +2,19 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 
 from app.core.database import get_async_db
-from app.services.routing_service import kalkulasi_evakuasi_darurat, get_nearest_posko
+from app.services.routing_service import kalkulasi_evakuasi_darurat, get_nearest_posko, classify_disaster_flow
 
 router = APIRouter(prefix="", tags=["Routing Evakuasi & Posko"])
 
 class EvakuasiRequest(BaseModel):
-    lat: float = Field(..., ge=-10.0, le=10.0, description="Lintang titik pengguna")
-    lon: float = Field(..., ge=90.0, le=145.0, description="Bujur titik pengguna")
-    moda: Optional[str] = Field(default="mobil", description="Moda transportasi: mobil | motor | pejalan_kaki")
+    lat: Optional[float] = Field(default=None, ge=-10.0, le=10.0, description="Lintang titik pengguna")
+    lon: Optional[float] = Field(default=None, ge=90.0, le=145.0, description="Bujur titik pengguna")
+    kecamatan_id: Optional[Union[int, str]] = Field(default=None, description="ID atau kode kecamatan hasil cascading combobox")
+    jenis_bencana: Optional[str] = Field(default="gempa", description="tsunami | gempa | galodo | banjir | longsor | erupsi")
+    moda: Optional[str] = Field(default="mobil", description="Moda transportasi: mobil | motor | jalan_kaki")
 
 class InstruksiLangkah(BaseModel):
     teks: str
@@ -22,6 +24,7 @@ class InstruksiLangkah(BaseModel):
 class PoskoInfo(BaseModel):
     id: int
     nama: str
+    alamat: Optional[str] = None
     jenis: Optional[str] = None
     kapasitas: Optional[int] = None
     fasilitas: Optional[List[str]] = []
@@ -31,12 +34,18 @@ class PoskoInfo(BaseModel):
     lon: float
 
 class EvakuasiResponse(BaseModel):
+    alur: str = Field(..., description="ALUR_A (Tsunami) | ALUR_B (Non-Tsunami)")
+    jenis_bencana: str
     posko: PoskoInfo
     jarak_km: float
     estimasi_menit: int
     geometry: Dict[str, Any]
     instruksi: List[InstruksiLangkah]
     menghindari_blokade: bool
+    is_fallback: bool = False
+    fallback_info: Optional[Dict[str, Any]] = None
+    zonasi_info: Optional[Dict[str, Any]] = None
+    kecamatan_id: Optional[Union[int, str]] = None
 
 @router.post("/routing/evakuasi", response_model=EvakuasiResponse)
 async def evakuasi_darurat(
@@ -44,17 +53,19 @@ async def evakuasi_darurat(
     db: AsyncSession = Depends(get_async_db)
 ):
     """
-    Endpoint Inti Evakuasi:
-    1. Mencari 3 posko terdekat via KNN PostGIS
-    2. Mendeteksi apakah ada jalan terputus aktif akibat bencana
-    3. Menghitung rute terbaik menggunakan OSRM (normal) atau Valhalla (hindari blokade)
-    4. Mengembalikan geometri LineString & panduan turn-by-turn ala Google Maps.
+    Endpoint Inti Evakuasi Terpadu:
+    - ALUR A (Tsunami): Rekomendasi shelter di luar zona bahaya / shelter vertikal TES
+    - ALUR B (Non-Tsunami: Galodo & Gempa): Posko terdekat dalam kecamatan yang sama
+    - Fallback cerdas jika kecamatan belum memiliki posko aktif
+    - Menghitung rute turn-by-turn turn sadar blokade jalan (OSRM / Valhalla)
     """
     try:
         hasil = await kalkulasi_evakuasi_darurat(
             db=db,
             lat=payload.lat,
             lon=payload.lon,
+            kecamatan_id=payload.kecamatan_id,
+            jenis_bencana=payload.jenis_bencana or "gempa",
             moda=payload.moda or "mobil"
         )
         return hasil
@@ -79,119 +90,65 @@ async def evakuasi_darurat(
             }
         )
 
-@router.get("/posko")
-async def list_semua_posko(
-    jenis: Optional[str] = None,
-    include_nonaktif: bool = False,
+@router.get("/routing/bencana-aktif")
+async def cek_status_bencana_aktif(
     db: AsyncSession = Depends(get_async_db)
 ):
     """
-    Endpoint Publik: Mengembalikan seluruh posko/shelter/sirine dalam format GeoJSON 
-    FeatureCollection untuk ditampilkan sebagai layer titik di peta.
-    Dapat difilter berdasarkan jenis (misal: 'shelter_tes_tea', 'sirine_tsunami', dll.)
+    Mendeteksi status ancaman bencana aktif di Sumatera Barat secara real-time:
+    - Cek apakah ada gempa dengan potensi tsunami (Alur A)
+    - Cek peringatan dini cuaca ekstrem / galodo lahar dingin Marapi (Alur B)
+    - Rekomendasi alur default untuk tombol Evakuasi Sekarang
     """
-    conditions = []
-    params = {}
-
-    if not include_nonaktif and jenis != "sirine_tsunami":
-        conditions.append("status = 'aktif'")
-    if jenis:
-        conditions.append("jenis = :jenis")
-        params["jenis"] = jenis
-
-    where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-    query = text(f"""
-        SELECT 
-            id, nama, jenis, kapasitas, fasilitas, kontak_pic, kontak_telepon, status,
-            ST_X(lokasi) AS lon, ST_Y(lokasi) AS lat
-        FROM posko_evakuasi
-        {where_clause};
+    # 1. Cek potensi tsunami gempa BMKG
+    tsunami_q = text("""
+        SELECT external_id, magnitude, wilayah_teks, waktu_kejadian, potensi_tsunami
+        FROM gempa_bmkg
+        WHERE potensi_tsunami = true AND waktu_kejadian >= now() - INTERVAL '24 hours'
+        ORDER BY waktu_kejadian DESC LIMIT 1;
     """)
-    result = await db.execute(query, params)
-    rows = result.fetchall()
+    tsunami_row = (await db.execute(tsunami_q)).fetchone()
 
-    features = []
-    for r in rows:
-        features.append({
-            "type": "Feature",
-            "geometry": {
-                "type": "Point",
-                "coordinates": [float(r.lon), float(r.lat)]
-            },
-            "properties": {
-                "id": r.id,
-                "nama": r.nama,
-                "jenis": r.jenis,
-                "kapasitas": r.kapasitas,
-                "fasilitas": r.fasilitas or [],
-                "kontak_pic": r.kontak_pic,
-                "kontak_telepon": r.kontak_telepon,
-                "status": r.status
+    # 2. Cek peringatan cuaca / lahar dingin
+    cuaca_q = text("""
+        SELECT identifier, event, headline, severity, area_desc
+        FROM peringatan_cuaca_bmkg
+        WHERE expires >= now() OR created_at >= now() - INTERVAL '12 hours'
+        ORDER BY id DESC LIMIT 1;
+    """)
+    cuaca_row = (await db.execute(cuaca_q)).fetchone()
+
+    if tsunami_row:
+        return {
+            "status_siaga": "BAHAYA_TSUNAMI",
+            "alur_rekomendasi": "ALUR_A",
+            "jenis_bencana_aktif": "tsunami",
+            "keterangan": f"Peringatan Dini Tsunami Aktif: Gempa M{tsunami_row.magnitude} di {tsunami_row.wilayah_teks}",
+            "data": {
+                "gempa_id": tsunami_row.external_id,
+                "magnitude": float(tsunami_row.magnitude),
+                "waktu": tsunami_row.waktu_kejadian.isoformat() if tsunami_row.waktu_kejadian else None
             }
-        })
+        }
+    elif cuaca_row and ("galodo" in (cuaca_row.event or "").lower() or "lahar" in (cuaca_row.headline or "").lower()):
+        return {
+            "status_siaga": "SIAGA_GALODO",
+            "alur_rekomendasi": "ALUR_B",
+            "jenis_bencana_aktif": "galodo",
+            "keterangan": f"Peringatan Banjir Lahar Dingin (Galodo): {cuaca_row.headline}",
+            "data": {
+                "event": cuaca_row.event,
+                "area": cuaca_row.area_desc
+            }
+        }
+    else:
+        return {
+            "status_siaga": "NORMAL_SIAGA",
+            "alur_rekomendasi": "ALUR_B",
+            "jenis_bencana_aktif": "gempa",
+            "keterangan": "Tidak ada peringatan tsunami seketika. Siaga darurat gempa & banjir lokal aktif.",
+            "data": None
+        }
 
-    return {
-        "type": "FeatureCollection",
-        "features": features
-    }
 
-@router.get("/posko/nearest")
-async def nearest_posko_endpoint(
-    lat: float,
-    lon: float,
-    limit: int = 3,
-    db: AsyncSession = Depends(get_async_db)
-):
-    """
-    Mencari posko terdekat dari koordinat pengguna.
-    """
-    poskos = await get_nearest_posko(db, lat, lon, limit=limit)
-    return {"data": poskos}
-
-class PoskoStatusRequest(BaseModel):
-    status: str = Field(..., description="Status: aktif | penuh | nonaktif")
-    kapasitas: Optional[int] = None
-
-@router.put("/posko/{posko_id}/status")
-async def update_posko_status(
-    posko_id: int,
-    payload: PoskoStatusRequest,
-    db: AsyncSession = Depends(get_async_db)
-):
-    """
-    Operator & Admin: Memperbarui status ketersediaan posko evakuasi (aktif, penuh, nonaktif).
-    """
-    valid_status = ['aktif', 'penuh', 'nonaktif']
-    if payload.status not in valid_status:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={"error": {"code": "INVALID_STATUS", "message": "Status harus salah satu dari: aktif, penuh, nonaktif"}}
-        )
-
-    query = text("""
-        UPDATE posko_evakuasi
-        SET status = :status,
-            kapasitas = COALESCE(:kapasitas, kapasitas),
-            updated_at = now()
-        WHERE id = :posko_id
-        RETURNING id, nama, status, kapasitas;
-    """)
-    res = await db.execute(query, {
-        "status": payload.status,
-        "kapasitas": payload.kapasitas,
-        "posko_id": posko_id
-    })
-    row = res.fetchone()
-    if not row:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": {"code": "NOT_FOUND", "message": f"Posko dengan ID {posko_id} tidak ditemukan."}}
-        )
-    await db.commit()
-    return {
-        "message": f"Status posko '{row.nama}' berhasil diubah menjadi '{row.status}'.",
-        "id": row.id,
-        "status": row.status,
-        "kapasitas": row.kapasitas
-    }
 

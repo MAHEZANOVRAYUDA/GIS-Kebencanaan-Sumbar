@@ -118,11 +118,44 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['maplibre-gl'],
   },
+  build: {
+    chunkSizeWarningLimit: 1400,
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
+            return 'vendor-react';
+          }
+          if (id.includes('node_modules/maplibre-gl') || id.includes('node_modules/pmtiles')) {
+            return 'vendor-maplibre';
+          }
+          if (id.includes('node_modules/echarts') || id.includes('node_modules/zrender')) {
+            return 'vendor-echarts';
+          }
+          if (id.includes('node_modules/lucide-react')) {
+            return 'vendor-icons';
+          }
+        },
+      },
+    },
+  },
   server: {
     host: '127.0.0.1',
     port: 5173,
     proxy: {
       '/api': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+      '/provinsi': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+      '/kota': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+      '/kecamatan': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
       },

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import * as echarts from 'echarts';
 import { BarChart3, ChevronDown, ChevronUp } from 'lucide-react';
 
@@ -29,15 +29,22 @@ export const StatistikChart: React.FC<StatistikChartProps> = ({
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Urutkan data berdasarkan total kerugian terbesar (Top 10 untuk kejelasan visual)
-  const topData = [...data]
-    .sort((a, b) => b.total_kerugian - a.total_kerugian)
-    .slice(0, 10)
-    .reverse(); // Reverse untuk horizontal bar chart agar urutan tertinggi di atas
+  const topData: KecamatanStatItem[] = useMemo(() => {
+    return [...data]
+      .sort((a, b) => b.total_kerugian - a.total_kerugian)
+      .slice(0, 10)
+      .reverse(); // Reverse untuk horizontal bar chart agar urutan tertinggi di atas
+  }, [data]);
 
   useEffect(() => {
-    if (!chartRef.current || isCollapsed) return;
+    if (!chartRef.current) return;
 
-    if (!chartInstance.current) {
+    // Pastikan jika instance terlepas dari DOM atau belum ada, inisialisasi ulang
+    const existingDom = chartInstance.current?.getDom();
+    if (!chartInstance.current || chartInstance.current.isDisposed() || existingDom !== chartRef.current) {
+      if (chartInstance.current && !chartInstance.current.isDisposed()) {
+        chartInstance.current.dispose();
+      }
       chartInstance.current = echarts.init(chartRef.current, 'dark', {
         renderer: 'canvas',
       });
@@ -184,7 +191,16 @@ export const StatistikChart: React.FC<StatistikChartProps> = ({
       ],
     };
 
-    chartInstance.current.setOption(option);
+    chartInstance.current.setOption(option, true);
+
+    // Resize observer agar ukuran grafik selalu presisi
+    const resizeObserver = new ResizeObserver(() => {
+      chartInstance.current?.resize();
+    });
+
+    if (chartRef.current) {
+      resizeObserver.observe(chartRef.current);
+    }
 
     const handleResize = () => {
       chartInstance.current?.resize();
@@ -192,9 +208,34 @@ export const StatistikChart: React.FC<StatistikChartProps> = ({
 
     window.addEventListener('resize', handleResize);
     return () => {
+      resizeObserver.disconnect();
       window.removeEventListener('resize', handleResize);
     };
   }, [topData, selectedWilayahId, isCollapsed, onSelectKecamatan]);
+
+  // Resize otomatis ketika user membuka/menutup kartu
+  useEffect(() => {
+    if (!isCollapsed && chartInstance.current) {
+      const t1 = setTimeout(() => {
+        chartInstance.current?.resize();
+      }, 50);
+      const t2 = setTimeout(() => {
+        chartInstance.current?.resize();
+      }, 320);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
+    }
+  }, [isCollapsed]);
+
+  // Clean-up menyeluruh saat komponen di-unmount
+  useEffect(() => {
+    return () => {
+      chartInstance.current?.dispose();
+      chartInstance.current = null;
+    };
+  }, []);
 
   return (
     <div
@@ -225,18 +266,15 @@ export const StatistikChart: React.FC<StatistikChartProps> = ({
         </div>
       </div>
 
-      {/* Konten ECharts */}
-      {!isCollapsed && (
-        <div className="relative w-full h-[calc(100%-2.75rem)] p-2">
-          {topData.length === 0 ? (
-            <div className="w-full h-full flex items-center justify-center text-xs text-slate-400 font-mono">
-              Tidak ada data kerugian tercatat
-            </div>
-          ) : (
-            <div ref={chartRef} className="w-full h-full" />
-          )}
-        </div>
-      )}
+      {/* Konten ECharts (Selalu berada di dalam DOM agar kanvas tidak hilang saat di-minimize) */}
+      <div className={`relative w-full h-[calc(100%-2.75rem)] p-2 transition-opacity duration-200 ${isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+        <div ref={chartRef} className="w-full h-full" />
+        {topData.length === 0 && (
+          <div className="absolute inset-0 bg-[#1B2733]/80 backdrop-blur-xs flex items-center justify-center text-xs text-slate-400 font-mono">
+            Tidak ada data kerugian tercatat
+          </div>
+        )}
+      </div>
     </div>
   );
 };

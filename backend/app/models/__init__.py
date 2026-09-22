@@ -8,6 +8,7 @@ from app.models.pengguna import Pengguna
 from app.models.audit import AuditLog
 
 from app.models.cuaca import PeringatanCuacaBMKG
+from app.models.zonasi import ZonasiTsunami
 
 __all__ = [
     "Base",
@@ -20,5 +21,6 @@ __all__ = [
     "Pengguna",
     "AuditLog",
     "PeringatanCuacaBMKG",
+    "ZonasiTsunami",
 ]
 
